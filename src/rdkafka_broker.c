@@ -294,6 +294,12 @@ void rd_kafka_broker_set_state (rd_kafka_broker_t *rkb, int state) {
 		     rd_kafka_broker_state_names[rkb->rkb_state],
 		     rd_kafka_broker_state_names[state]);
 
+	rd_kafka_log(rkb->rkb_rk, LOG_NOTICE, "BROKER",
+			"%s: Broker changed state %s -> %s",
+			rkb->rkb_name,
+			rd_kafka_broker_state_names[rkb->rkb_state],
+			rd_kafka_broker_state_names[state]);
+
 	if (rkb->rkb_source == RD_KAFKA_INTERNAL) {
 		/* no-op */
 	} else if (state == RD_KAFKA_BROKER_STATE_DOWN &&
@@ -1355,13 +1361,16 @@ void rd_kafka_broker_connect_up (rd_kafka_broker_t *rkb) {
 	rd_kafka_broker_set_state(rkb, RD_KAFKA_BROKER_STATE_UP);
 	rd_kafka_broker_unlock(rkb);
 
-        /* Request metadata (async):
-         * try locally known topics first and if there are none try
-         * getting just the broker list. */
-        if (rd_kafka_metadata_refresh_known_topics(NULL, rkb, 0/*dont force*/,
-                                                   "connected") ==
-            RD_KAFKA_RESP_ERR__UNKNOWN_TOPIC)
-                rd_kafka_metadata_refresh_brokers(NULL, rkb, "connected");
+    /* Request metadata (async):
+        * try locally known topics first and if there are none try
+        * getting just the broker list. */
+    if (rd_kafka_metadata_refresh_known_topics(NULL, rkb, 0/*dont force*/,"connected") == RD_KAFKA_RESP_ERR__UNKNOWN_TOPIC)
+      
+		rd_kafka_metadata_refresh_brokers(NULL, rkb, "connected");
+
+	rd_kafka_log(rkb->rkb_rk, LOG_NOTICE, "BROKER", "%s: connected",rkb->rkb_name);
+
+
 }
 
 

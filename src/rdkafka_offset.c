@@ -229,30 +229,6 @@ static int64_t rd_kafka_offset_file_read (rd_kafka_toppar_t *rktp) {
 	return offset;
 }
 
-
-/**
- * Sync/flush offset file.
- */
-static int rd_kafka_offset_file_sync (rd_kafka_toppar_t *rktp) {
-        if (!rktp->rktp_offset_fp)
-                return 0;
-
-        rd_kafka_dbg(rktp->rktp_rkt->rkt_rk, TOPIC, "SYNC",
-                     "%s [%"PRId32"]: offset file sync",
-                     rktp->rktp_rkt->rkt_topic->str,
-                     rktp->rktp_partition);
-
-#ifndef _MSC_VER
-	(void)fflush(rktp->rktp_offset_fp);
-	(void)fsync(fileno(rktp->rktp_offset_fp)); // FIXME
-#else
-	// FIXME
-	// FlushFileBuffers(_get_osfhandle(fileno(rktp->rktp_offset_fp)));
-#endif
-	return 0;
-}
-
-
 /**
  * Write offset to offset file.
  *
@@ -263,7 +239,8 @@ rd_kafka_offset_file_commit (rd_kafka_toppar_t *rktp) {
 	rd_kafka_itopic_t *rkt = rktp->rktp_rkt;
 	int attempt;
         rd_kafka_resp_err_t err = RD_KAFKA_RESP_ERR_NO_ERROR;
-        int64_t offset = rktp->rktp_stored_offset;
+		//int64_t offset = rktp->rktp_stored_offset;
+		int64_t offset = rktp->rktp_committed_offset;
 
 	for (attempt = 0 ; attempt < 2 ; attempt++) {
 		char buf[22];
@@ -326,8 +303,8 @@ rd_kafka_offset_file_commit (rd_kafka_toppar_t *rktp) {
 		rktp->rktp_committed_offset = offset;
 
 		/* If sync interval is set to immediate we sync right away. */
-		if (rkt->rkt_conf.offset_store_sync_interval_ms == 0)
-			rd_kafka_offset_file_sync(rktp);
+	/*	if (rkt->rkt_conf.offset_store_sync_interval_ms == 0)
+			rd_kafka_offset_file_sync(rktp);*/
 
 
 		return RD_KAFKA_RESP_ERR_NO_ERROR;
@@ -335,6 +312,31 @@ rd_kafka_offset_file_commit (rd_kafka_toppar_t *rktp) {
 
 
 	return err;
+}
+
+/**
+* Sync/flush offset file.
+*/
+static int rd_kafka_offset_file_sync(rd_kafka_toppar_t *rktp) {
+	/*if (!rktp->rktp_offset_fp)
+	return 0;*/
+
+	rd_kafka_dbg(rktp->rktp_rkt->rkt_rk, TOPIC, "SYNC",
+		"%s [%"PRId32"]: offset file sync",
+		rktp->rktp_rkt->rkt_topic->str,
+		rktp->rktp_partition);
+
+#ifndef _MSC_VER
+	(void)fflush(rktp->rktp_offset_fp);
+	(void)fsync(fileno(rktp->rktp_offset_fp)); // FIXME
+#else
+	// FIXME
+	// FlushFileBuffers(_get_osfhandle(fileno(rktp->rktp_offset_fp)));
+
+	return rd_kafka_offset_file_commit(rktp);
+
+#endif
+	return 0;
 }
 
 
@@ -688,36 +690,6 @@ rd_kafka_resp_err_t rd_kafka_offset_store (rd_kafka_topic_t *app_rkt,
 	rd_kafka_toppar_destroy(s_rktp);
 
 	return RD_KAFKA_RESP_ERR_NO_ERROR;
-}
-
-
-rd_kafka_resp_err_t
-rd_kafka_offsets_store (rd_kafka_t *rk,
-                        rd_kafka_topic_partition_list_t *offsets) {
-        int i;
-        int ok_cnt = 0;
-
-        for (i = 0 ; i < offsets->cnt ; i++) {
-                rd_kafka_topic_partition_t *rktpar = &offsets->elems[i];
-                shptr_rd_kafka_toppar_t *s_rktp;
-
-                s_rktp = rd_kafka_topic_partition_get_toppar(rk, rktpar);
-                if (!s_rktp) {
-                        rktpar->err = RD_KAFKA_RESP_ERR__UNKNOWN_PARTITION;
-                        continue;
-                }
-
-                rd_kafka_offset_store0(rd_kafka_toppar_s2i(s_rktp),
-                                       rktpar->offset, 1/*lock*/);
-                rd_kafka_toppar_destroy(s_rktp);
-
-                rktpar->err = RD_KAFKA_RESP_ERR_NO_ERROR;
-                ok_cnt++;
-        }
-
-        return offsets->cnt > 0 && ok_cnt < offsets->cnt ?
-                RD_KAFKA_RESP_ERR__UNKNOWN_PARTITION :
-                RD_KAFKA_RESP_ERR_NO_ERROR;
 }
 
 

@@ -226,16 +226,6 @@ enum ErrorCode {
         ERR__UNSUPPORTED_FEATURE = -165,
         /** Awaiting cache update */
         ERR__WAIT_CACHE = -164,
-        /** Operation interrupted */
-        ERR__INTR = -163,
-        /** Key serialization error */
-        ERR__KEY_SERIALIZATION = -162,
-        /** Value serialization error */
-        ERR__VALUE_SERIALIZATION = -161,
-        /** Key deserialization error */
-        ERR__KEY_DESERIALIZATION = -160,
-        /** Value deserialization error */
-        ERR__VALUE_DESERIALIZATION = -159,
 	/** End internal error codes */
 	ERR__END = -100,
 
@@ -757,6 +747,10 @@ class RD_EXPORT Conf {
                                 const std::string &value,
                                 std::string &errstr) = 0;
 
+  /** @brief Use with \p name = \c \"consume_cb\" */
+  virtual Conf::ConfResult set (const std::string &name, ConsumeCb *consume_cb,
+                                std::string &errstr) = 0;
+
   /** @brief Use with \p name = \c \"dr_cb\" */
   virtual Conf::ConfResult set (const std::string &name,
                                 DeliveryReportCb *dr_cb,
@@ -863,10 +857,6 @@ class RD_EXPORT Conf {
   /** @brief Dump configuration names and values to list containing
    *         name,value tuples */
   virtual std::list<std::string> *dump () = 0;
-
-  /** @brief Use with \p name = \c \"consume_cb\" */
-  virtual Conf::ConfResult set (const std::string &name, ConsumeCb *consume_cb,
-				std::string &errstr) = 0;
 };
 
 /**@}*/
@@ -1059,35 +1049,6 @@ class RD_EXPORT Handle {
    * @returns ERR_NO_ERROR on success or an error code on error.
    */
   virtual ErrorCode set_log_queue (Queue *queue) = 0;
-
-  /**
-   * @brief Cancels the current callback dispatcher (Producer::poll(),
-   *        Consumer::poll(), KafkaConsumer::consume(), etc).
-   *
-   * A callback may use this to force an immediate return to the calling
-   * code (caller of e.g. ..::poll()) without processing any further
-   * events.
-   *
-   * @remark This function MUST ONLY be called from within a
-   *         librdkafka callback.
-   */
-  virtual void yield () = 0;
-
-  /**
-   * @brief Returns the ClusterId as reported in broker metadata.
-   *
-   * @param timeout_ms If there is no cached value from metadata retrieval
-   *                   then this specifies the maximum amount of time
-   *                   (in milliseconds) the call will block waiting
-   *                   for metadata to be retrieved.
-   *                   Use 0 for non-blocking calls.
-   *
-   * @remark Requires broker version >=0.10.0 and api.version.request=true.
-   *
-   * @returns Last cached ClusterId, or empty string if no ClusterId could be
-   *          retrieved in the allotted timespan.
-   */
-  virtual const std::string clusterid (int timeout_ms) = 0;
 };
 
 
@@ -1304,10 +1265,6 @@ class RD_EXPORT Message {
   virtual void               *msg_opaque () const = 0;
 
   virtual ~Message () = 0;
-
-  /** @returns the latency in microseconds for a produced message measured
-   *           from the produce() call, or -1 if latency is not available. */
-  virtual int64_t             latency () const = 0;
 };
 
 /**@}*/
@@ -1637,20 +1594,6 @@ public:
    * @returns an ErrorCode to indicate success or failure.
    */
   virtual ErrorCode seek (const TopicPartition &partition, int timeout_ms) = 0;
-
-
-  /**
-   * @brief Store offset \p offset for topic partition \p partition.
-   * The offset will be committed (written) to the offset store according
-   * to \p auto.commit.interval.ms or the next manual offset-less commit*()
-   *
-   * Per-partition success/error status propagated through TopicPartition.err()
-   *
-   * @remark \c enable.auto.offset.store must be set to \c false when using this API.
-   *
-   * @returns RdKafka::ERR_NO_ERROR on success or an error code on error.
-   */
-  virtual ErrorCode offsets_store (std::vector<TopicPartition*> &offsets) = 0;
 };
 
 
